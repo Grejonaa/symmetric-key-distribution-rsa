@@ -57,11 +57,11 @@ class RSAUtils:
                 label=None
             )
         )
-        if __name__ == "__main__":  # ← PA hapësira, jashtë klasës
-    priv, pub = RSAUtils.generate_keys()
-    enc = RSAUtils.encrypt(pub, b"test")
-    dec = RSAUtils.decrypt(priv, enc)
-    print("OK" if dec == b"test" else "GABIM")
-
+        
+    if __name__ == "__main__":
+        priv, pub = RSAUtils.generate_keys()
+        enc = RSAUtils.encrypt(pub, b"test")
+        dec = RSAUtils.decrypt(priv, enc)
+        print("OK" if dec == b"test" else "GABIM")
 
 
