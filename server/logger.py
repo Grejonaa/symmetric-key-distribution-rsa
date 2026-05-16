@@ -1,21 +1,30 @@
 import logging
 import os
 
-# krijon folderin logs nese nuk ekziston
-if not os.path.exists("logs"):
-    os.makedirs("logs")
 
-logging.basicConfig(
-    filename="logs/server.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+def setup_logger() -> logging.Logger:
+    os.makedirs("logs", exist_ok=True)
 
-def log_info(message):
-    logging.info(message)
+    logger = logging.getLogger("SERVER")
+    logger.setLevel(logging.INFO)
 
-def log_error(message):
-    logging.error(message)
+    if not logger.handlers:
+        console_handler = logging.StreamHandler()
+        file_handler = logging.FileHandler(
+            "logs/server.log",
+            mode="a",
+            encoding="utf-8"
+        )
 
-def log_warning(message):
-    logging.warning(message)
+        formatter = logging.Formatter(
+            "[%(asctime)s] %(levelname)s — %(message)s",
+            datefmt="%H:%M:%S"
+        )
+
+        console_handler.setFormatter(formatter)
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(console_handler)
+        logger.addHandler(file_handler)
+
+    return logger
