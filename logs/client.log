@@ -1,0 +1,24 @@
+2026-05-17 16:14:48 [INFO] Logger u inicializua me sukses.
+2026-05-17 16:14:48 [INFO] Klienti u startua.
+2026-05-17 16:14:49 [INFO] Çelësat RSA u gjeneruan me sukses (2048-bit).
+2026-05-17 16:14:49 [INFO] U lidh me serverin 127.0.0.1:65432.
+2026-05-17 16:14:49 [INFO] Mesazh u dërgua me sukses.
+2026-05-17 16:14:49 [INFO] Çelësi publik RSA u dërgua te serveri.
+2026-05-17 16:14:49 [INFO] Mesazh u pranua nga serveri.
+2026-05-17 16:14:49 [INFO] Çelësi simetrik AES u dekriptua me sukses.
+2026-05-17 16:14:59 [INFO] Përdoruesi shkroi një mesazh.
+2026-05-17 16:14:59 [INFO] Mesazhi u enkriptua me AES.
+2026-05-17 16:14:59 [INFO] Mesazh u dërgua me sukses.
+2026-05-17 16:14:59 [INFO] Mesazh i enkriptuar u dërgua te serveri.
+2026-05-17 16:16:18 [INFO] Përdoruesi shkroi një mesazh.
+2026-05-17 16:16:18 [INFO] Mesazhi u enkriptua me AES.
+2026-05-17 16:16:18 [INFO] Mesazh u dërgua me sukses.
+2026-05-17 16:16:18 [INFO] Mesazh i enkriptuar u dërgua te serveri.
+2026-05-17 16:16:21 [INFO] Përdoruesi shkroi një mesazh.
+2026-05-17 16:16:21 [INFO] Mesazhi u enkriptua me AES.
+2026-05-17 16:16:21 [INFO] Mesazh u dërgua me sukses.
+2026-05-17 16:16:21 [INFO] Mesazh i enkriptuar u dërgua te serveri.
+2026-05-17 16:16:30 [INFO] Përdoruesi shkroi një mesazh.
+2026-05-17 16:16:30 [INFO] Mesazhi u enkriptua me AES.
+2026-05-17 16:16:30 [INFO] Mesazh u dërgua me sukses.
+2026-05-17 16:16:30 [INFO] Mesazh i enkriptuar u dërgua te serveri.

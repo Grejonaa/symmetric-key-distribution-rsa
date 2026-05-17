@@ -9,6 +9,13 @@ This project implements a secure communication system using a **hybrid encryptio
 
 The system follows a **client-server model**, where the server acts as a trusted authority that distributes encrypted symmetric keys to clients.
 The system logs all major events such as key generation, encryption, decryption, and communication between client and server.
+The client application includes comprehensive logging and error handling mechanisms for:
+- JSON communication errors
+- Encryption/decryption failures
+- Connection interruptions
+- Invalid server responses
+The application uses rotating log files to improve maintainability and prevent unlimited log growth.
+The client validates AES key lengths before encryption to ensure compliance with AES standards.
 
 ---
 
