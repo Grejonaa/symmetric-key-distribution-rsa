@@ -1,11 +1,12 @@
 import socket
 import json
 import datetime
+import base64
 
-from logger import setup_logger
-from key_manager import generate_symmetric_key, decrypt_message
-from rsa_utils import receive_public_key, encrypt_symmetric_key
+from server.logger import setup_logger
 
+from crypto.rsa_utils import RSAUtils
+from crypto.symmetric_utils import SymmetricUtils
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -13,160 +14,182 @@ PORT = 65432
 logger = setup_logger()
 
 
+# NETWORK HELPERS
+
 def _recv_exact(conn: socket.socket, n: int) -> bytes:
     buf = b""
-
-    while len(buf) < n:
-        chunk = conn.recv(n - len(buf))
-
-        if not chunk:
-            return b""
-
-        buf += chunk
-
-    return buf
+    try:
+        while len(buf) < n:
+            chunk = conn.recv(n - len(buf))
+            if not chunk:
+                return b""
+            buf += chunk
+        return buf
+    except Exception as e:
+        logger.exception(f"Recv error: {e}")
+        return b""
 
 
 def recv_message(conn: socket.socket) -> dict:
-    raw_len = _recv_exact(conn, 4)
+    try:
+        raw_len = _recv_exact(conn, 4)
+        if not raw_len:
+            raise ConnectionError("Client disconnected")
 
-    if not raw_len:
-        raise ConnectionError("Klienti u shkëput papritur.")
+        msg_len = int.from_bytes(raw_len, "big")
+        data = _recv_exact(conn, msg_len)
 
-    msg_len = int.from_bytes(raw_len, "big")
-    data = _recv_exact(conn, msg_len)
+        if not data:
+            raise ConnectionError("No data received")
 
-    return json.loads(data.decode("utf-8"))
+        return json.loads(data.decode("utf-8"))
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
+        raise
+    except Exception as e:
+        logger.exception(f"recv_message error: {e}")
+        raise
 
 
 def send_message(conn: socket.socket, payload: dict) -> None:
-    data = json.dumps(payload).encode("utf-8")
-    msg_len = len(data).to_bytes(4, "big")
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        msg_len = len(data).to_bytes(4, "big")
+        conn.sendall(msg_len + data)
 
-    conn.sendall(msg_len + data)
+    except Exception as e:
+        logger.exception(f"send_message error: {e}")
+        raise
 
+
+# -----------------------------
+# CLIENT HANDLER
+# -----------------------------
 
 def handle_client(conn: socket.socket, addr: tuple, client_id: str) -> None:
-    logger.info(f"[{client_id}] U lidh nga {addr[0]}:{addr[1]}")
-    print(f"\n  Klient i lidhur: {client_id} ({addr[0]}:{addr[1]})\n")
+    logger.info(f"[{client_id}] Connected from {addr}")
+    print(f"\nClient connected: {client_id} {addr}\n")
 
     try:
-        symmetric_key = generate_symmetric_key()
-        logger.info(f"[{client_id}] Çelës AES-256 u gjenerua.")
+        # 1. RSA keypair (server side optional, log only)
+        RSAUtils.generate_keys()
+        logger.info(f"[{client_id}] RSA context ready")
 
-        logger.info(f"[{client_id}] Duke pritur çelësin publik RSA...")
+        # 2. Receive client public key
         msg = recv_message(conn)
 
-        client_public_key = receive_public_key(msg)
-        logger.info(
-            f"[{client_id}] Çelësi publik RSA u mor "
-            f"({client_public_key.size_in_bits()} bit)."
+        if msg.get("type") != "public_key":
+            raise ValueError("Expected public_key")
+
+        client_public_key = RSAUtils.load_public_key(
+            msg["public_key"].encode("utf-8")
         )
 
-        encrypted_key_b64 = encrypt_symmetric_key(
-            symmetric_key,
-            client_public_key
-        )
+        logger.info(f"[{client_id}] Public key received")
+
+        # 3. Generate AES key
+        symmetric_key = SymmetricUtils.generate_key()
+        logger.info(f"[{client_id}] AES key generated")
+
+        # 4. Encrypt AES key with RSA
+        encrypted_key = RSAUtils.encrypt(client_public_key, symmetric_key)
+
+        encrypted_key_b64 = base64.b64encode(encrypted_key).decode("utf-8")
 
         send_message(conn, {
             "type": "encrypted_symmetric_key",
-            "encrypted_key": encrypted_key_b64,
+            "encrypted_key": encrypted_key_b64
         })
 
-        logger.info(
-            f"[{client_id}] Çelësi simetrik u dërgua i enkriptuar me RSA-OAEP."
-        )
-        print(f"  Çelësi simetrik i enkriptuar u dërgua te {client_id}.\n")
+        logger.info(f"[{client_id}] AES key sent")
 
-        print(f"  Duke pritur mesazhe nga {client_id}...\n")
-        print("-" * 50)
+        # -----------------------------
+        # MESSAGE LOOP
+        # -----------------------------
+
+        print(f"Listening to {client_id}...\n")
 
         while True:
             try:
                 msg = recv_message(conn)
 
-            except (ConnectionError, json.JSONDecodeError):
-                logger.info(f"[{client_id}] Klienti u shkëput. Sesioni mbaroi.")
+            except ConnectionError:
+                logger.info(f"[{client_id}] Disconnected")
                 break
 
             msg_type = msg.get("type")
 
+            # ---------------- encrypted message
             if msg_type == "encrypted_message":
+
                 try:
-                    plaintext = decrypt_message(
+                    iv = base64.b64decode(msg["iv"])
+                    ciphertext = base64.b64decode(msg["ciphertext"])
+
+                    plaintext = SymmetricUtils.decrypt(
                         symmetric_key,
-                        msg["iv"],
-                        msg["ciphertext"]
+                        iv,
+                        ciphertext
                     )
 
                     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
-                    print(f"  [{timestamp}] Mesazh nga {client_id}:")
-                    print(f"  > {plaintext}\n")
+                    print(f"[{timestamp}] {client_id}: {plaintext}")
 
-                    logger.info(f"[{client_id}] Mesazh i dekriptuar me sukses.")
+                    logger.info(f"[{client_id}] Message decrypted")
 
-                except Exception as error:
-                    logger.error(f"[{client_id}] Gabim në dekriptim: {error}")
-                    print(f"  Gabim në dekriptim: {error}\n")
+                except Exception as e:
+                    logger.exception(f"[{client_id}] AES decrypt error: {e}")
 
+            # ---------------- disconnect
             elif msg_type == "disconnect":
-                logger.info(f"[{client_id}] Klienti u shkëput me sinjal.")
-                print(f"  {client_id} u shkëput.\n")
+                logger.info(f"[{client_id}] Client requested disconnect")
                 break
 
             else:
-                logger.warning(
-                    f"[{client_id}] Lloj mesazhi i panjohur: {msg_type}"
-                )
+                logger.warning(f"[{client_id}] Unknown message type: {msg_type}")
 
-    except ValueError as error:
-        logger.error(f"[{client_id}] Gabim protokolli: {error}")
-        print(f"  Gabim protokolli: {error}")
-
-    except ConnectionError as error:
-        logger.error(f"[{client_id}] Lidhja u ndërpre: {error}")
-        print(f"  Lidhja u ndërpre: {error}")
-
-    except Exception as error:
-        logger.error(f"[{client_id}] Gabim i papritur: {error}")
-        print(f"  Gabim i papritur: {error}")
+    except Exception as e:
+        logger.exception(f"[{client_id}] Fatal error: {e}")
 
     finally:
         conn.close()
-        logger.info(f"[{client_id}] Socket u mbyll.")
-        print(f"  Lidhja me {client_id} u mbyll.\n")
+        logger.info(f"[{client_id}] Connection closed")
+        print(f"Client {client_id} closed connection\n")
 
 
-def main() -> None:
+# -----------------------------
+# MAIN SERVER
+# -----------------------------
+
+def main():
     print("=" * 50)
-    print("   SYMMETRIC KEY DISTRIBUTION SERVER")
+    print(" SYMMETRIC KEY DISTRIBUTION SERVER ")
     print("=" * 50)
-    print(f"   Host : {HOST}")
-    print(f"   Port : {PORT}")
-    print("=" * 50)
-    print(f"\n  Duke pritur lidhje në {HOST}:{PORT}...\n")
+
+    logger.info("Server starting")
 
     client_counter = 0
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_sock:
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_sock.bind((HOST, PORT))
-        server_sock.listen(5)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST, PORT))
+        server.listen(5)
 
-        logger.info(f"Serveri është aktiv në {HOST}:{PORT}")
+        print(f"Listening on {HOST}:{PORT}\n")
 
         try:
             while True:
-                conn, addr = server_sock.accept()
+                conn, addr = server.accept()
                 client_counter += 1
                 client_id = f"Client-{client_counter}"
 
                 handle_client(conn, addr, client_id)
 
         except KeyboardInterrupt:
-            print("\nServeri u ndal nga përdoruesi.")
-            logger.info("Serveri u ndal.")
+            logger.info("Server stopped manually")
+            print("\nServer stopped")
 
 
 if __name__ == "__main__":
