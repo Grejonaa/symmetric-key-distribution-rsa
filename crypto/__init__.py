@@ -1,2 +1,2 @@
-from .rsa_utils import RSAUtils
-from .symmetric_utils import SymmetricUtils
+from crypto.rsa_utils import RSAUtils
+from crypto.symmetric_utils import SymmetricUtils

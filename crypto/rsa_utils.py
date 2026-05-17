@@ -57,11 +57,14 @@ class RSAUtils:
                 label=None
             )
         )
-        
-    if __name__ == "__main__":
-        priv, pub = RSAUtils.generate_keys()
-        enc = RSAUtils.encrypt(pub, b"test")
-        dec = RSAUtils.decrypt(priv, enc)
-        print("OK" if dec == b"test" else "GABIM")
 
 
+# TEST
+if __name__ == "__main__":
+    private_key, public_key = RSAUtils.generate_keys()
+
+    encrypted = RSAUtils.encrypt(public_key, b"test")
+
+    decrypted = RSAUtils.decrypt(private_key, encrypted)
+
+    print("OK" if decrypted == b"test" else "GABIM")
