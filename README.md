@@ -8,6 +8,7 @@ This project implements a secure communication system using a **hybrid encryptio
 *  **Symmetric Encryption** → used to encrypt and decrypt messages
 
 The system follows a **client-server model**, where the server acts as a trusted authority that distributes encrypted symmetric keys to clients.
+The system logs all major events such as key generation, encryption, decryption, and communication between client and server.
 
 ---
 
